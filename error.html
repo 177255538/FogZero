@@ -1,58 +1,90 @@
+// abyss-fallback.js
+export default {
+  async fetch(request, env, ctx) {
+    const PRIMARY_URL = 'https://fogzero.ccwu.cc'; // 你的 Tunnel 域名
+    const FALLBACK_HTML = `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>网站维护中 - fogzero.ccwu.cc</title>
+    <title>VOID // SYSTEM_OFFLINE</title>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0f;
+            color: #ff006e;
+            font-family: monospace;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-image: radial-gradient(circle at 50% 50%, rgba(255,0,110,0.1) 0%, transparent 70%);
+        }
+        .container {
+            border: 1px solid #ff006e;
+            padding: 60px;
+            background: rgba(0,0,0,0.9);
             text-align: center;
-            padding: 50px 20px;
-            background: #f0f2f5;
+            box-shadow: 0 0 30px rgba(255,0,110,0.2);
+            animation: glitch 4s infinite;
         }
-        .card {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        @keyframes glitch {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(-1px, 1px); }
+            40% { transform: translate(-1px, -1px); }
         }
-        h1 { font-size: 72px; margin: 0 0 10px; color: #e74c3c; }
-        h2 { margin: 0 0 20px; color: #333; }
-        p { color: #666; line-height: 1.6; }
-        .contact {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            font-size: 14px;
-        }
-        a { color: #3498db; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .token-box {
-            margin-top: 20px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            font-size: 12px;
-            color: #999;
-        }
+        .code { font-size: 6rem; font-weight: bold; text-shadow: 0 0 20px #ff006e; margin-bottom: 20px; }
+        .title { color: #00f5d4; font-size: 1.5rem; margin-bottom: 15px; }
+        .msg { color: rgba(0,245,212,0.7); margin: 5px 0; }
+        .status { color: #ff3333; margin-top: 20px; padding: 10px; border: 1px solid #ff3333; display: inline-block; }
+        .time { margin-top: 30px; font-size: 0.8rem; color: #666; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>🔧 503</h1>
-        <h2>我的手机服务器正在休息~</h2>
-        <p>手机服务器可能熄屏了、没电了，或者我在更新代码。</p>
-        <p>请稍等几分钟再试试，或者直接联系我：</p>
-        <p>📧 <a href="mailto:177255538@qq.com">177255538@qq.com</a></p>
-        <div class="token-box">
-            <!-- Cloudflare 会自动在这里显示详细错误信息 -->
-            ::CLOUDFLARE_ERROR_500S_BOX::
-        </div>
-        <div class="contact">
-            <a href="https://fogzero.ccwu.cc">← 返回首页</a>
-        </div>
+    <div class="container">
+        <div class="code">404</div>
+        <div class="title">[ 深渊档案库 ]</div>
+        <div class="msg">节点离线或维护中</div>
+        <div class="status">SYSTEM_OFFLINE</div>
+        <div class="time">${new Date().toLocaleString('zh-CN')}</div>
     </div>
 </body>
-</html>
+</html>`;
+
+    try {
+      // 健康检查（3秒超时）
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      
+      const healthCheck = await fetch(`${PRIMARY_URL}/api/health`, {
+        method: 'GET',
+        signal: controller.signal,
+        cf: { cacheTtl: 0 }
+      });
+      
+      clearTimeout(timeout);
+
+      // 主服务在线，透传请求
+      if (healthCheck.ok) {
+        const response = await fetch(PRIMARY_URL + request.url.pathname + request.url.search, {
+          method: request.method,
+          headers: request.headers,
+          body: request.body
+        });
+        return response;
+      }
+      
+      throw new Error('Health check failed');
+      
+    } catch (err) {
+      // 主服务离线，返回自定义 404
+      return new Response(FALLBACK_HTML, {
+        status: 503,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Retry-After': '30'
+        }
+      });
+    }
+  }
+};
